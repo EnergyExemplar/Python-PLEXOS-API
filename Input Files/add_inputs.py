@@ -7,34 +7,42 @@ Created on Sat Sep 09 19:19:57 2017
 @author: Steven
 """
 
-import os
+import os, sys, clr
 from shutil import copyfile
 
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly#, build_assembly
-
 # load PLEXOS assemblies
-plexos_path = 'C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/'
-add_assemblies(plexos_path)
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append('C:/Program Files/Energy Exemplar/PLEXOS 10.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # .NET related imports
-from PLEXOS7_NET.Core import DatabaseCore
+from PLEXOS_NET.Core import DatabaseCore
 from EEUTILITY.Enums import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+from System import DateTime
 
-if os.path.exists('rts_PLEXOS.xml'):
+folder = os.path.dirname(__file__)
+basefile = os.path.join(folder, 'rts_PLEXOS.xml')
+copiedfile = os.path.join(folder, 'rts2.xml')
+if os.path.exists(basefile):
+
 
     # delete the modified file if it already exists
-    if os.path.exists('rts2.xml'):
-        os.remove('rts2.xml')
+    if os.path.exists(copiedfile):
+        os.remove(copiedfile)
 
     # copy the PLEXOS input file
-    copyfile('rts_PLEXOS.xml', 'rts2.xml')
+    copyfile(basefile, copiedfile)
     
     # Create an object to store the input data
     db = DatabaseCore()
-    db.Connection('rts2.xml')
+    db.DisplayAlerts = False
+    db.Connection(copiedfile)
+    
+    classes = db.FetchAllClassIds()
+    collections = db.FetchAllCollectionIds()
+    properties = db.FetchAllPropertyEnums()
     
     # Add a category
     '''
@@ -43,7 +51,8 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strCategory
     	)
     '''
-    db.AddCategory(ClassEnum.Generator, 'API')
+    db.AddCategory(classes["Generator"], 'API')
+    db.AddCategory(classes["GasPipeline"], 'API')
     
     # Add an object (and the System Membership)
     '''
@@ -55,8 +64,9 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strDescription[ = None]
     	)
     '''
-    db.AddObject('ApiGen', ClassEnum.Generator, True, 'API', 'Testing the API')
-    
+    db.AddObject('ApiGen', classes["Generator"], True, 'API', 'Testing the API')
+    db.AddObject('ApiPipe', classes["GasPipeline"], True, 'API', 'Testing the API')
+
     # Add memberships
     '''
     Int32 AddMembership(
@@ -65,9 +75,9 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strChild
     	)
     '''
-    db.AddMembership(CollectionEnum.GeneratorNodes, 'ApiGen', '101')    
-    db.AddMembership(CollectionEnum.GeneratorFuels, 'ApiGen', 'Coal/Steam')
-    db.AddMembership(CollectionEnum.ReserveGenerators, 'Spin Up', 'ApiGen')
+    db.AddMembership(collections["GeneratorNodes"], 'ApiGen', '101')    
+    db.AddMembership(collections["GeneratorFuels"], 'ApiGen', 'Coal/Steam')
+    db.AddMembership(collections["ReserveGenerators"], 'Spin Up', 'ApiGen')
     
     # Get the System.Generators membership ID for this new generator
     '''
@@ -77,8 +87,11 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strChild
     	)    
     '''
-    mem_id = db.GetMembershipID(CollectionEnum.SystemGenerators, \
-                                'System', 'ApiGen')
+    mem_id = db.GetMembershipID(
+        collections["SystemGenerators"], 
+        'System', 
+        'ApiGen'
+    )
                                 
     # Add properties
     '''
@@ -95,28 +108,44 @@ if os.path.exists('rts_PLEXOS.xml'):
     	Object Scenario,
     	Object Action,
     	PeriodEnum PeriodTypeId
-    	)
-     
-    Because of the number of parameters, we need
-        a. An alias for AddProperty
-        b. A tuple of parameter values
-        c. A call to the alias
-        
-    Also we need to obtain the EnumId for each property
-    that we intend to add
+    	)   
     '''
-    # a. An alias for AddProperty
-    addProp = db.AddProperty[Int32,Int32,Int32,Double,Object, \
-                             Object,Object,Object,Object,Object, \
-                             Object,PeriodEnum]
-    
-    # b. A tuple of parameter values
-    params = (mem_id, int(SystemGeneratorsEnum.Units), \
-              1, 0.0, None, None, None, None, None, None, \
-              0, PeriodEnum.Interval)
-    
-    # c. A call to the alias
-    addProp.__invoke__(params)
+    # Add units for the new generator
+    db.AddProperty(
+        mem_id, 
+        properties["SystemGenerators.Units"],
+        1, 
+        0.0, 
+        None, 
+        None, 
+        None, 
+        None, 
+        None, 
+        None, 
+        0, 
+        PeriodEnum.Interval
+    )
+
+    mem_id = db.GetMembershipID(
+            collections["SystemGasPipelines"], 
+            'System', 
+            'ApiPipe'
+        )
+    # Add IsAvailable for the new pipeline
+    db.AddProperty(
+        mem_id,
+        properties["SystemGasPipelines.IsAvailable"], 
+        1, 
+        1, 
+        DateTime(2024,1,1),
+        None, 
+        None, 
+        None, 
+        None, 
+        None, 
+        0, 
+        PeriodEnum.Interval
+    )
     
     # save the data set
     db.Close()

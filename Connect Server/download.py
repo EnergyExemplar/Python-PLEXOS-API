@@ -5,51 +5,49 @@ Launch a PLEXOS Connect run
 Created on Mon Jun 05 11:36:46 2017
 
 @author: Steven
+
+P9 Tested
 """
 
 # standard Python/SciPy libraries
-import getpass, sys, os
-
-# Python .NET interface
-if not 'dotnet.seamless' in sys.modules:
-    from dotnet.seamless import add_assemblies, load_assembly
-
+import getpass, sys, os, clr
 
 # .NET related imports
-if not 'PLEXOS7_NET.Core' in sys.modules:
-    # load PLEXOS assemblies
-    add_assemblies('C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/')
-    load_assembly('PLEXOS7_NET.Core')
-    import PLEXOS7_NET.Core as plx
+sys.path.append('C:\Program Files\Energy Exemplar\PLEXOS 9.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
-if not 'EEUTILITY.Enums' in sys.modules:
-    # load PLEXOS assemblies
-    add_assemblies('C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/')
-    load_assembly('EEUTILITY')
-    from EEUTILITY.Enums import *
+from PLEXOS_NET.Core import PLEXOSConnect
+from EEUTILITY.Enums import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+import PLEXOS_NET.Core as plx
+from System.IO import SearchOption
 
-if not 'System' in sys.modules:
-    from System import *
-    
-if not 'System.IO' in sys.modules:
-    from System.IO import SearchOption
+server =   input('Server:          ')
+port =     input('Port (def:8888): ')
+try:
+    port = int(port)
+except:
+    port = 8888
+username = input('Username:        ')
+password = getpass.getpass('Password:        ')
 
-server = raw_input('Server:   ')
-username = raw_input('Username: ')
-password = getpass.getpass('Password: ')
-folder = raw_input('Folder:   ')
-dataset = raw_input('Dataset:  ')
+# connect to the PLEXOS Connect server
+cxn = plx.PLEXOSConnect()
+cxn.DisplayAlerts = False
+cxn.Connection('Data Source={}:{};User Id={};Password={}'.format(server,port,username,password))
+
+folder = input('Folder:   ')
+local = input('Local Folder: ')
+dataset = input('Dataset:  ')
 
 if len(dataset) == 0:
     dataset = 'testdb'
     
-# connect to the PLEXOS Connect server
-cxn = plx.PLEXOSConnect()
-cxn.Connection('Data Source={};User Id={};Password={}'.format(server,username,password))
-
 # verify that the dataset exists
 if not cxn.CheckDatasetExists(folder,dataset):
-    print 'Dataset', dataset, 'does not exist in folder', folder
+    print('Dataset', dataset, 'does not exist in folder', folder)
     
 else:
     '''
@@ -60,7 +58,10 @@ else:
     '''
     ver = cxn.GetDatasetLatestVersion(folder,dataset)
     
-    dest = os.path.join(folder,dataset)
+    if not os.path.exists(local):
+        os.mkdir(local)
+
+    dest = os.path.join(local,dataset)
     os.mkdir(dest)
 
     '''

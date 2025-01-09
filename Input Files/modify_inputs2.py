@@ -5,25 +5,29 @@ Create scenarios and add data overlays to a PLEXOS input dataset
 Created on Sat Sep 09 19:19:57 2017
 
 @author: Steven
+
+P9 Tested
 """
 
-import os
+import os, sys, clr
 from datetime import datetime
 from shutil import copyfile
 
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly#, build_assembly
-
 # load PLEXOS assemblies
-plexos_path = 'C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/'
-add_assemblies(plexos_path)
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+# unfortunately there was an error in the PLEXOS 8.1 API that caused
+#   scenario tagging to fail. It was fixed in version 8.2.
+sys.path.append('C:\Program Files\Energy Exemplar\PLEXOS 10.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # .NET related imports
-from PLEXOS7_NET.Core import DatabaseCore
+from PLEXOS_NET.Core import DatabaseCore
 from EEUTILITY.Enums import *
-from System import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+from System import DateTime
+
+if os.path.exists('Input Files'): os.chdir('Input Files')
 
 if os.path.exists('rts_PLEXOS.xml'):
 
@@ -36,7 +40,12 @@ if os.path.exists('rts_PLEXOS.xml'):
     
     # Create an object to store the input data
     db = DatabaseCore()
+    db.DisplayAlerts = False
     db.Connection('rts4.xml')
+    
+    classes = db.FetchAllClassIds()
+    collections = db.FetchAllCollectionIds()
+    properties = db.FetchAllPropertyEnums()
 
     # Add a category of scenarios if needed
     '''
@@ -49,8 +58,8 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strCategory
     	)
     '''
-    if not db.CategoryExists(ClassEnum.Scenario, 'Added by API'):
-        db.AddCategory(ClassEnum.Scenario, 'Added by API')
+    if not db.CategoryExists(classes["Scenario"], 'Added by API'):
+        db.AddCategory(classes["Scenario"], 'Added by API')
 
     # Add a scenario
     '''
@@ -63,7 +72,7 @@ if os.path.exists('rts_PLEXOS.xml'):
     	)
     '''
     scenario = 'API{:%Y%m%d%H%M}'.format(datetime.now())
-    db.AddObject(scenario, ClassEnum.Scenario, True, 'Added by API')
+    db.AddObject(scenario, classes["Scenario"], True, 'Added by API')
 
     # Create data and tag it with the scenario
     '''
@@ -82,13 +91,10 @@ if os.path.exists('rts_PLEXOS.xml'):
     	PeriodEnum PeriodTypeId
     	)
     '''
-    # alias
-    add_prop = db.AddProperty[Int32,Int32,Int32,Double,Object,Object, \
-                              Object,Object,Object,Object,Object,PeriodEnum]
     
     # parameters
-    mem_id = db.GetMembershipID(CollectionEnum.SystemFuels,'System','NG/CT')
-    enum_id = int(SystemFuelsEnum.Price) 
+    mem_id = db.GetMembershipID(collections["SystemFuels"],'System','NG/CT')
+    enum_id = properties["SystemFuels.Price"]
     
     # we'll add three property rows... monthly gas prices for 3 months
     params = [(mem_id, enum_id, 1, 5.0, DateTime(2024,1,1), None, None, None, None, scenario, None, PeriodEnum.Interval),
@@ -97,8 +103,12 @@ if os.path.exists('rts_PLEXOS.xml'):
     
     # invoke
     for p in params:
-        add_prop.__invoke__(p)
-    
+        '''
+        If you use version 8.1 there will be an exception here stating 
+        that the scenario couldn't be found. Switch to 8.0 or 8.2.
+        '''
+        db.AddProperty(*p)
+
     # Add the scenario to a model
     '''
     Int32 AddMembership(
@@ -107,7 +117,7 @@ if os.path.exists('rts_PLEXOS.xml'):
     	String strChild
     	)
     '''
-    db.AddMembership(CollectionEnum.ModelScenarios, 'Q1 DA', scenario)
+    db.AddMembership(collections["ModelScenarios"], 'Q1 DA', scenario)
     
     # save the data set
     db.Close()

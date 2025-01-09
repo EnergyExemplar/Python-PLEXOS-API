@@ -6,17 +6,17 @@ Created on Sat Sep 09 09:41:33 2017
 """
 
 # Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly
+import clr, sys
 
-# load PLEXOS assemblies... replace the path below with the installation
-#   installation folder for your PLEXOS installation.
-add_assemblies('C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/')
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append('C:/Program Files/Energy Exemplar/PLEXOS 9.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # Import from .NET assemblies (both PLEXOS and system)
-from PLEXOS7_NET.Core import *
+from PLEXOS_NET.Core import *
 from EEUTILITY.Enums import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
 
 def list_method(method):
     text = '{} {}('.format(method.ReturnType.Name, method.Name)
@@ -33,7 +33,8 @@ def list_method(method):
     return text
        
 with open('api_exploration.txt', 'w') as fout:
-    for method in type(Solution).GetMethods():
+    sol = Solution()
+    for method in sol.GetType().GetMethods():
         fout.write('{}\n'.format(list_method(method)))
 
 

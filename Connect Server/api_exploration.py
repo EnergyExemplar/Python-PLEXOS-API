@@ -5,21 +5,21 @@ Explore the DatabaseCore class
 Created on Sat Sep 09 20:11:21 2017
 
 @author: Steven
+
+P9 Tested
 """
 
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly#, build_assembly
+import os, sys, clr
 
 # load PLEXOS assemblies
-plexos_path = 'C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/'
-add_assemblies(plexos_path)
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append('C:\Program Files\Energy Exemplar\PLEXOS 9.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # .NET related imports
-from PLEXOS7_NET.Core import PLEXOSConnect
+from PLEXOS_NET.Core import PLEXOSConnect
 
-fout = open('PLEXOSConnectMethods.txt','w')
 def list_method(method):
     text = '{} {}('.format(method.ReturnType.Name, method.Name)
     isFirst = True
@@ -34,6 +34,5 @@ def list_method(method):
     text += '\n\t)\n'
     return text
        
-fout.writelines([list_method(method) for method in type(PLEXOSConnect).GetMethods()])
-
-fout.close()
+with open('PLEXOSConnectMethods.txt','w') as fout:
+    fout.writelines([list_method(method) for method in clr.GetClrType(PLEXOSConnect).GetMethods()])

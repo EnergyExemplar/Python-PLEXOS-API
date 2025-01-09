@@ -1,42 +1,36 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Sep 09 20:33:10 2017
+Created on Mon Sep 11 12:54:57 2017
 
 @author: Steven
+
+P9 Tested
 """
 
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly#, build_assembly
+import os, sys, clr
 
 # load PLEXOS assemblies
-plexos_path = 'C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/'
-add_assemblies(plexos_path)
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append('C:\Program Files\Energy Exemplar\PLEXOS 9.0 API')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # .NET related imports
 from EEUTILITY.Enums import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+from System import Enum
 
-# a function to format the presentation of enumerations
-def list_enum_names(t):
-    try:
+with open('EEUTILITY_Enums.txt', 'w') as fout:
+    for t in clr.GetClrType(ClassEnum).Assembly.GetTypes():
         if t.IsEnum:
-            text = '{}\n'.format(t.Name)
-            names = t.GetEnumNames()
-            for idx in range(0,len(names),4):
-                for jdx in range(idx,min(len(names),idx+4)):
-                    text += '\t{}'.format(names[jdx])
-                text += '\n'
-        else:
-            text = 'Not an enumeration'
-    except:
-        text = 'Not a type'
-    finally:
-        return text
-    
-# traverse all enums
-for t in type(ClassEnum).Assembly.GetTypes():
-    print list_enum_names(t)
-    
-# ClassEnum is immediately useful
-print list_enum_names(type(ClassEnum))
+            fout.write('{}\n'.format(t.Name))
+            for en in t.GetEnumNames():
+                fout.write('\t{} = {}\n'.format(en, int(Enum.Parse(t, en))))
+            fout.write('\n')
+
+with open('EnergyExemplar_PLEXOS_UTILITY_Enums.txt', 'w') as fout:
+    for t in clr.GetClrType(FlatFileFormatEnum).Assembly.GetTypes():
+        if t.IsEnum:
+            fout.write('{}\n'.format(t.Name))
+            for en in t.GetEnumNames():
+                fout.write('\t{} = {}\n'.format(en, int(Enum.Parse(t, en))))
+            fout.write('\n')

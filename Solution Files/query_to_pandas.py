@@ -8,71 +8,73 @@ Created on Fri Sep 08 15:03:46 2017
 @author: Steven
 """
 
-# standard Python/SciPy libraries
-import os
+# standard Python libraries
+import os, clr, sys
 import pandas as pd
-from datetime import datetime
-
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly
 
 # load PLEXOS assemblies... replace the path below with the installation
 #   installation folder for your PLEXOS installation.
-add_assemblies('C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.4/')
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append('C:/Program Files/Energy Exemplar/PLEXOS 10.0 API')
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # Import from .NET assemblies (both PLEXOS and system)
-from PLEXOS7_NET.Core import *
+from PLEXOS_NET.Core import *
 from EEUTILITY.Enums import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+from System import String
 
 # Create a PLEXOS solution file object and load the solution
 sol = Solution()
 sol_file = 'Model Q2 Week1 DA Solution.zip' # replace with your solution file
 if not os.path.exists(sol_file):
-    print 'No such file'
-    exit
+    print('No such file')
+else:
+        
+    sol.Connection(sol_file)
     
-sol.Connection(sol_file)
-
-'''
-Simple query: works similarly to PLEXOS Solution Viewer
-
-Solution.Query(phase, collection, parent, child, period, series, props)
-    phase -> SimulationPhaseEnum
-    collection -> CollectionEnum
-    parent -> the name of a parent object or ''
-    child -> the name of a child object or ''
-    period -> PeriodEnum
-    series -> SeriesTypeEnum
-    props -> a string containing an integer indicating the Property to query or ''
-returns a ADODB recordset... however, you don't *need* to worry about that...
-'''
-
-# Run the query
-results = sol.Query(SimulationPhaseEnum.STSchedule, \
-                    CollectionEnum.SystemGenerators, \
-                    '', \
-                    '', \
-                    PeriodEnum.FiscalYear, \
-                    SeriesTypeEnum.Values, \
-                    '')
-
-# Check to see if the query had results
-if results.EOF:
-    print 'No results'
-    exit
-
-# Create a DataFrame with a column for each column in the results
-df = pd.DataFrame(columns=[x.Name for x in results.Fields])
-
-# loop through the recordset
-idx = 0    
-while not results.EOF:
-    df.loc[idx] = [str(x.Value) for x in results.Fields]
-    idx += 1
-    results.MoveNext() #VERY IMPORTANT
+    '''
+    Simple query: works similarly to PLEXOS Solution Viewer
     
-wb = pd.ExcelWriter('query.xlsx')
-df.to_excel(wb, 'Query') # 'Query' is the name of the worksheet
-wb.save()
+    QueryToList(
+    	SimulationPhaseEnum SimulationPhaseId,
+    	CollectionEnum CollectionId,
+    	String ParentName,
+    	String ChildName,
+    	PeriodEnum PeriodTypeId,
+    	SeriesTypeEnum SeriesTypeId,
+    	String PropertyList[ = None],
+    	Object DateFrom[ = None],
+    	Object DateTo[ = None],
+    	String TimesliceList[ = None],
+    	String SampleList[ = None],
+    	String ModelName[ = None],
+    	AggregationEnum AggregationType[ = None],
+    	String Category[ = None],
+    	String Filter[ = None]
+    	)
+    '''
+    
+    # Setup and run the query
+    collections = sol.FetchAllCollectionIds()
+    results = sol.QueryToList(SimulationPhaseEnum.STSchedule,
+              collections["SystemGenerators"],
+              '',
+              '',
+              PeriodEnum.FiscalYear,
+              SeriesTypeEnum.Values)
+              
+    #Important to Close() the Solution to clear working storage.
+    sol.Close()
+
+    # Check to see if the query had results
+    if results is None:
+        print('No results')
+    else:
+        # Create a DataFrame with a column for each column in the results
+        columns = results.Columns
+        df = pd.DataFrame([[row.GetProperty.Overloads[String](n) for n in columns] for row in results], columns=columns)
+        wb = pd.ExcelWriter('query.xlsx')
+        df.to_excel(wb, 'Query') # 'Query' is the name of the worksheet
+        wb.close()

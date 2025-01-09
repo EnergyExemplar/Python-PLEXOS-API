@@ -5,23 +5,22 @@ Created on Mon Dec 17 15:42:56 2018
 @author: Steven.Broad
 """
 
-import os, datetime as dt
+import os, sys, clr, datetime as dt
 from shutil import copyfile
 
-# Python .NET interface
-from dotnet.seamless import add_assemblies, load_assembly#, build_assembly
-
 # load PLEXOS assemblies
-plexos_path = 'C:/Program Files (x86)/Energy Exemplar/PLEXOS 7.5/'
+plexos_path = 'C:/Program Files/Energy Exemplar/PLEXOS 10.0 API'
 
-add_assemblies(plexos_path)
-load_assembly('PLEXOS7_NET.Core')
-load_assembly('EEUTILITY')
+sys.path.append(plexos_path)
+clr.AddReference('PLEXOS_NET.Core')
+clr.AddReference('EEUTILITY')
+clr.AddReference('EnergyExemplar.PLEXOS.Utility')
 
 # .NET related imports
-from PLEXOS7_NET.Core import DatabaseCore
+from PLEXOS_NET.Core import DatabaseCore
 from EEUTILITY.Enums import *
-from System import *
+from EnergyExemplar.PLEXOS.Utility.Enums import *
+from System import DateTime, String, Int32, Double
 
 def modify_model_horizon(datafile, modelname, start):
     
@@ -40,6 +39,10 @@ def modify_model_horizon(datafile, modelname, start):
     # Create an object to store the input data
     db = DatabaseCore()
     db.Connection(tempfile)
+    
+    classes = db.FetchAllClassIds()
+    collections = db.FetchAllCollectionIds()
+    attributes = db.FetchAllAttributeEnums()
 
     '''
     String[] GetChildMembers(
@@ -47,7 +50,6 @@ def modify_model_horizon(datafile, modelname, start):
     	String strParent
     	)
     '''
-    getchildren = db.GetChildMembers[CollectionEnum,String]
     
     '''
     Boolean UpdateAttribute(
@@ -58,16 +60,12 @@ def modify_model_horizon(datafile, modelname, start):
                          <--- using the ToOADate() method of the DateTime class
     	)
     '''
-
-    # aliases for UpdateAttribute and AddAttribute methods      
-    update = db.UpdateAttribute[ClassEnum,String,Int32,Double]
-    add = db.AddAttribute[ClassEnum,String,Int32,Double]
-    
-    horizons = getchildren.__invoke__((CollectionEnum.ModelHorizon, modelname))
+   
+    horizons = db.GetChildMembers(collections["ModelHorizon"], modelname)
     for hor in horizons:
-        update.__invoke__((ClassEnum.Horizon, hor, int(HorizonAttributeEnum.DateFrom), DateTime(start.Year, 1, 1).ToOADate()))
-        update.__invoke__((ClassEnum.Horizon, hor, int(HorizonAttributeEnum.StepType), 4))
-        update.__invoke__((ClassEnum.Horizon, hor, int(HorizonAttributeEnum.ChronoDateFrom), start.ToOADate()))
+        db.UpdateAttribute(classes["Horizon"], hor, int(attributes["Horizon.DateFrom"]), DateTime(start.Year, 1, 1).ToOADate())
+        db.UpdateAttribute(classes["Horizon"], hor, int(attributes["Horizon.StepType"]), 4)
+        db.UpdateAttribute(classes["Horizon"], hor, int(attributes["Horizon.ChronoDateFrom"]), start.ToOADate())
                     
     # save the data set
     db.Close()
